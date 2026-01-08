@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">ProCalc</string>
+    <string name="history">History</string>
+    <string name="clear_history">Clear</string>
+    <string name="no_history">No history yet</string>
+    <string name="calculator">Calculator</string>
+    <string name="mode_deg">DEG</string>
+    <string name="mode_rad">RAD</string>
+</resources>

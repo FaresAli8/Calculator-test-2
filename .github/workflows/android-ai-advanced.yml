@@ -1,0 +1,107 @@
+name: AI Android Advanced Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      buildType:
+        description: "Build type (debug or release)"
+        required: true
+        default: "debug"
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GRADLE_VERSION: 8.5
+      JAVA_VERSION: "17"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---------- Java ----------
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      # ---------- Android ----------
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # ---------- Preflight (fail early, clear messages) ----------
+      - name: Preflight checks
+        run: |
+          echo "🔍 Running preflight checks..."
+          test -f settings.gradle* || (echo "❌ Missing settings.gradle" && exit 1)
+          test -d app || (echo "❌ Missing app module" && exit 1)
+          test -f app/src/main/AndroidManifest.xml || (echo "❌ Missing AndroidManifest.xml" && exit 1)
+          echo "✅ Preflight OK"
+
+      # ---------- Gradle Wrapper ----------
+      - name: Ensure Gradle Wrapper
+        run: |
+          if [ ! -f "./gradlew" ]; then
+            echo "⚙️ Generating Gradle Wrapper $GRADLE_VERSION"
+            sudo apt-get update
+            sudo apt-get install -y gradle
+            gradle wrapper --gradle-version $GRADLE_VERSION
+          fi
+          chmod +x ./gradlew
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      # ---------- gradle.properties safety ----------
+      - name: Ensure gradle.properties
+        run: |
+          if [ ! -f "gradle.properties" ]; then
+            echo "⚙️ Creating gradle.properties"
+            cat <<EOF > gradle.properties
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
+          kotlin.code.style=official
+          EOF
+          fi
+
+      # ---------- Icon fallback ----------
+      - name: Ensure launcher icon
+        run: |
+          ICON="app/src/main/res/drawable/ic_launcher.xml"
+          if [ ! -f "$ICON" ]; then
+            echo "🎨 Creating fallback launcher icon"
+            mkdir -p app/src/main/res/drawable
+            cat <<EOF > $ICON
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path android:fillColor="#3DDC84" android:pathData="M0,0h108v108h-108z"/>
+              <path android:fillColor="#FFFFFF" android:pathData="M54,54m-20,0a20,20 0 1,1 40,0a20,20 0 1,1 -40,0"/>
+          </vector>
+          EOF
+          fi
+
+      # ---------- Licenses ----------
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses
+
+      # ---------- Build ----------
+      - name: Build APK
+        run: |
+          if [ "${{ github.event.inputs.buildType }}" = "release" ]; then
+            ./gradlew assembleRelease -x lint --no-daemon --stacktrace
+          else
+            ./gradlew assembleDebug -x lint --no-daemon --stacktrace
+          fi
+
+      # ---------- Upload ----------
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ github.event.inputs.buildType || 'debug' }}
+          path: app/build/outputs/apk/**/*.apk

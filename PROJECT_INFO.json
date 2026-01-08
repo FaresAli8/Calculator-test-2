@@ -1,0 +1,15 @@
+{
+    "projectName": "ProCalc",
+    "packageName": "com.procalc.app",
+    "sdkVersion": 34,
+    "language": "Kotlin",
+    "framework": "Jetpack Compose",
+    "features": [
+        "Advanced Calculation Engine",
+        "Scientific Operations (Sqrt, Pow)",
+        "History with Persistence",
+        "Dark Mode / Material 3",
+        "Arabic & English Support",
+        "Offline & Privacy Focused"
+    ]
+}
